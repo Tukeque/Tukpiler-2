@@ -3,8 +3,11 @@ from error import error, debug
 from copy import copy
 import config
 
+def random_salt() -> str:
+    return str(randint(0, 2**20))
+
 def random_name() -> str:
-    return f"RANDOM_{randint(0, 2**20)}"
+    return f"RANDOM_{random_salt()}"
 
 op_to_urcl = {
     "+": "ADD",
@@ -150,4 +153,40 @@ class Var:
         for var in temps:
             var.free()
 
-        
+class Func:
+    def __init__(self, name, args, return_type, manager):
+        self.name = name
+        self.args: list[list[str]] = args
+        self.return_type = return_type
+        self.manager = manager
+
+        self.used_regs: list[str] = []
+        self.archived_regs: dict[str, str] = {}
+        self.salt = random_salt()
+
+    def save(self) -> list[str]:
+        urcl = [f".save_{self.name}_{self.salt}", "PSH R1"]
+
+        for reg in self.used_regs:
+            urcl.append(f"PSH {reg}")
+
+        return urcl
+
+    def restore(self) -> list[str]:
+        urcl = []
+
+        for reg in self.archived_regs:
+            urcl.append(f"LOD {reg} {self.archived_regs[reg]}")
+
+        return urcl
+
+    def header(self) -> list[str]:
+        urcl = [f"{self.name}_{self.salt}", "POP R1"]
+
+        for arg in self.args:
+            if arg[0] == "num" or "none":
+                self.manager.get_var(arg[1], arg[0], self.manager.type_to_width[arg[0]])
+            else:
+                self.manager.get_pointer(arg[1], arg[0])
+
+        return urcl
