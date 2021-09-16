@@ -77,6 +77,17 @@ class Reader(Generic[T]):
     def __repr__(self) -> str:
         return "[" + ", ".join([repr(x) for x in self.elements]) + "]"
 
+    def split(self, splitter: T) -> list[list[T]]:
+        result = [[]]
+
+        for item in self.elements:
+            if item == splitter:
+                result.append([])
+            else:
+                result[-1].append(item)
+
+        return result
+
 class Lexer:
     def __init__(self, separators: list[str], style, joiner: str = ";", strings: list[str] = ['"', "'"], comments: bool = True, comment_tokens: list[str] = ["#", "//"], multi_comment_tokens: list[list[str]] = [["/*", "*/"], ["///", "///"], ['"""', '"""']]):
         self.separators = separators
