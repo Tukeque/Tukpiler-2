@@ -10,13 +10,16 @@ class Manager:
     available_reg: list[int] = list(range(1, config.regs))
     var_order: list[var.Var] = []
     vars: dict[str, var.Var] = []
+    in_func: bool            = False
 
     header: list[str] = []
     funcs : list[str] = []
     main  : list[str] = []
 
-    def __init__(self, vars: dict[str, var.Var]):
-        self.vars = vars
+    def __init__(self, vars: dict[str, var.Var], funcs: dict[str, var.Func], type_to_width: dict[str, int]):
+        self.vars  = vars
+        self.funcs = funcs
+        self.type_to_width = type_to_width
 
     def get_reg(self, name: str, type: str) -> var.Var:
         self.available_reg.sort()
@@ -54,6 +57,10 @@ class Manager:
                 return self.get_mem(name, type, width)
         elif type == "none":
             return self.var(var.Var(name, "none", var.Pointer("M0", "ram"), 1, self))
+
+    def get_pointer(self, name: str, type: str, width: int):
+        # todo
+        pass
 
     def emit(self, x, func: bool = False):
         debug(f"emitting {x}")
