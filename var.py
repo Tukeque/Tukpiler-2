@@ -53,12 +53,14 @@ class Pointer:
         return int(self.addr[1:])
 
 class Var:
-    def __init__(self, name: str, type: str, pointer: Pointer, width: int, manager):
+    def __init__(self, name: str, type: str, pointer: Pointer, width: int, manager, is_pointer: bool = False):
         self.name    = name
         self.type    = type
         self.pointer = pointer
         self.width   = width
         self.manager = manager
+
+        self.is_pointer = is_pointer
 
     def archive(self):
         if self.pointer.type == "reg":
@@ -97,16 +99,33 @@ class Var:
 
         self.update()
 
-        if config.arch == "urcl":
-            if self.pointer.type == "reg":
-                return self.pointer.addr
+        if self.is_pointer:
+            if config.arch == "urcl":
+                if self.pointer.type == "reg":
+                    result = self.manager.get_reg(self.pointer, "num")
+                    self.manager.emit(f"LOD {result.pointer.addr} {self.pointer.addr}")
 
-            else: # self.pointer.type == "ram":
-                local = self.manager.get_reg(self.pointer, "num")
-                local.set(Wrapped("var", self)) # copy to local
-                
-                return local.get()
-        # todo silk
+                    return result.pointer.addr
+
+                else: # self.pointer.type == "ram":
+                    local = self.manager.get_reg(self.pointer, "num")
+                    local.set(Wrapped("var", self)) # copy to local
+
+                    result = self.manager.get_reg(self.pointer, "num")
+                    self.manager.emit(f"LOD {result.pointer.addr} {self.pointer.addr}")
+
+                    return result.pointer.addr
+        else:
+            if config.arch == "urcl":
+                if self.pointer.type == "reg":
+                    return self.pointer.addr
+
+                else: # self.pointer.type == "ram":
+                    local = self.manager.get_reg(self.pointer, "num")
+                    local.set(Wrapped("var", self)) # copy to local
+
+                    return local.get()
+            # todo silk
 
     def set(self, x: Wrapped):
         if x.type == "var":
