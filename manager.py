@@ -21,21 +21,21 @@ class Manager:
         self.funcs = funcs
         self.type_to_width = type_to_width
 
-    def get_reg(self, name: str, type: str) -> var.Var:
+    def get_reg(self, name: str, type: str, is_pointer: bool = False) -> var.Var:
         self.available_reg.sort()
 
         if len(self.available_reg) >= 1: # has space
             first = self.available_reg.pop(0)
-            return self.var(var.Var(name, type, var.Pointer(f"R{first}", "reg"), 1, self))
+            return self.var(var.Var(name, type, var.Pointer(f"R{first}", "reg"), 1, self, is_pointer=is_pointer))
 
         else: # no space, must archive
             for i in range(len(self.var_order)):
                 if self.var_order[i].pointer.type == "reg":
                     new_pointer = self.var_order[i].archive()
 
-                    return self.var(var.Var(name, type, new_pointer, 1, self))
+                    return self.var(var.Var(name, type, new_pointer, 1, self, is_pointer=is_pointer))
 
-    def get_mem(self, name: str, type: str, width: int) -> var.Var:
+    def get_mem(self, name: str, type: str, width: int, is_pointer: bool = False) -> var.Var:
         if len(self.available_ram) >= width:
             sort = sorted(self.available_ram)
 
@@ -43,20 +43,20 @@ class Manager:
                 first = self.available_ram[0]
                 self.available_ram = self.available_ram[width:]
 
-                return self.var(var.Var(name, type, var.Pointer(f"M{first}", "ram"), width, self))
+                return self.var(var.Var(name, type, var.Pointer(f"M{first}", "ram"), width, self, is_pointer=is_pointer))
             else:
                 error("memory didnt free in a way to fit a variable in consecutive addresses") # todo make it check for this in every ram address free and restructure if else
         else:
             error("ran out of memory") # no space (,_,)
 
-    def get_var(self, name: str, type: str, width: int, store_ram: bool = False) -> var.Var:
+    def get_var(self, name: str, type: str, width: int, store_ram: bool = False, is_pointer: bool = False) -> var.Var:
         if type == "num":
             if config.num_reg and not store_ram:
-                return self.get_reg(name, type)
+                return self.get_reg(name, type, is_pointer=is_pointer)
             else:
-                return self.get_mem(name, type, width)
+                return self.get_mem(name, type, width, is_pointer=is_pointer)
         elif type == "none":
-            return self.var(var.Var(name, "none", var.Pointer("M0", "ram"), 1, self))
+            return self.var(var.Var(name, "none", var.Pointer("M0", "ram"), 1, self, is_pointer=is_pointer))
 
     def get_pointer(self, name: str, type: str, width: int):
         # todo
