@@ -92,7 +92,7 @@ class Var:
     def update(self):
         self.manager.update(self)
 
-    def get(self):
+    def get(self): # updated for pointers
         """
         Returns the value pointed to by the var, in a reg, whether or not its already stored in one
         """
@@ -172,6 +172,37 @@ class Var:
         for var in temps:
             var.free()
 
+    def push(self):
+        self.update()
+        self.manager.tos += 1
+
+        if self.is_pointer:
+            if config.arch == "urcl":
+                if self.pointer.type == "ram" and self.type == "num":
+                    temp = self.manager.get_reg(random_name(), "num")
+                    temp.set(Wrapped("var", self))
+
+                    self.manager.emit(f"PSH {temp.pointer.addr}")
+
+                else: # self.pointer.type == "reg" or "ram":
+                    self.manager.emit(f"PSH {self.pointer.addr}")
+            # todo silk
+
+    def pop(self):
+        self.update()
+        self.manager.tos -= 1
+
+        if config.arch == "urcl":
+            if self.pointer.type == "ram":
+                temp = self.manager.get_reg(random_name(), "num")
+            
+                self.manager.emit(f"POP {temp.pointer.addr}")
+                self.set(Wrapped("var", temp))
+
+            else: # self.pointer.type == "reg":
+                self.manager.emit(f"POP {self.pointer.addr}")
+        # todo silk
+
 class Func:
     def __init__(self, name, args, return_type, manager):
         self.name = name
@@ -184,7 +215,7 @@ class Func:
         self.salt = random_salt()
 
     def save(self) -> list[str]:
-        urcl = [f".save_{self.name}_{self.salt}", "PSH R1"]
+        urcl = [f".save_{self.name}_{self.salt}", "POP R1"]
 
         for reg in self.used_regs:
             urcl.append(f"PSH {reg}")
@@ -199,13 +230,13 @@ class Func:
 
         return urcl
 
-    def header(self) -> list[str]:
-        urcl = [f"{self.name}_{self.salt}", "POP R1"]
+    def header(self):stag
+        self.manager.emit([f"func_{self.name}_{self.salt}", "POP R1"])
+
+        self.args.reverse()
 
         for arg in self.args:
-            if arg[0] == "num" or "none":
-                self.manager.get_var(arg[1], arg[0], self.manager.type_to_width[arg[0]])
-            else:
-                self.manager.get_pointer(arg[1], arg[0])
+            x = self.manager.get_var(arg[1], arg[0], self.manager.type_to_width[arg[0]], True if arg[0] != "num" or "none" else False)
+            x.pop()
 
-        return urcl
+        self.args.reverse()
