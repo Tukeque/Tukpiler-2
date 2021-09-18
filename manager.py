@@ -11,6 +11,7 @@ class Manager:
     var_order: list[var.Var] = []
     vars: dict[str, var.Var] = []
     in_func: bool            = False
+    tos: int                 = 0
 
     header: list[str] = []
     funcs : list[str] = []

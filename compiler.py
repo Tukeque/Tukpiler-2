@@ -94,18 +94,19 @@ class Compiler:
         """
 
         name = expr[1]
-        args = Reader(expr[3:expr.index(")")])
+        args = Reader(expr[3:expr.index(")")]).split(",")
         ret_type = expr[expr.index(")") + 3]
 
         func = Func(name, args, ret_type)
         self.funcs[name] = func
 
         self.manager.in_func = True
-        self.manager.emit(func.header())
+        func.header()
 
         # compile insides
         self.parser.tokens = Reader(expr[expr.index("{") + 1:expr.index("}")])
-        self.compile(self.parser.parse())
+        use = self.compile(self.parser.parse()) # todo implement compiler return use
+        use = {"regs": 4, "global_ram": 5}
 
         # todo add return if doesn't have one (default case)
 
@@ -128,7 +129,7 @@ class Compiler:
                 self.compile_expr(expr)
             elif expr[0] == "function":
                 self.compile_func(expr)
-            elif expr[0] == "object":
-                error("objects arent implemented yet")
             elif expr[0] == "if":
                 error("conditionals arent implemented yet")
+            elif expr[0] == "object":
+                error("objects arent implemented yet")

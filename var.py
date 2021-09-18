@@ -230,7 +230,7 @@ class Func:
 
         return urcl
 
-    def header(self):stag
+    def header(self): # oops
         self.manager.emit([f"func_{self.name}_{self.salt}", "POP R1"])
 
         self.args.reverse()
