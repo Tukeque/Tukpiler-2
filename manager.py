@@ -50,18 +50,11 @@ class Manager:
         else:
             error("ran out of memory") # no space (,_,)
 
-    def get_var(self, name: str, type: str, width: int, store_ram: bool = False, is_pointer: bool = False) -> var.Var:
-        if type == "num":
-            if config.num_reg and not store_ram:
-                return self.get_reg(name, type, is_pointer=is_pointer)
-            else:
-                return self.get_mem(name, type, width, is_pointer=is_pointer)
-        elif type == "none":
+    def get_var(self, name: str, type: str, width: int, is_pointer: bool = False) -> var.Var:
+        if type != "none":
+            return self.get_mem(name, type, width, is_pointer=is_pointer)
+        else: # type == "none":
             return self.var(var.Var(name, "none", var.Pointer("M0", "ram"), 1, self, is_pointer=is_pointer))
-
-    def get_pointer(self, name: str, type: str, width: int):
-        # todo
-        pass
 
     def emit(self, x, func: bool = False):
         debug(f"emitting {x}")
@@ -246,7 +239,9 @@ class Manager:
 
                 if x.type != "imm":
                     if config.arch == "urcl":
-                        handled = x.value.get()
+                        temps = []
+                        handled = x.value.get(temps)
+                        for x in temps: x.free()
 
                         inst = {
                             "~+": f"AND {handled} &SMAX {handled}",

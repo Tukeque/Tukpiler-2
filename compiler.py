@@ -29,7 +29,7 @@ class Compiler:
         if type == "array":
             error("arrays aren't implemented yet")
         else: # anything else (num, none, MyObject, ...)
-            self.manager.get_var(name, type, self.type_to_width[type], not config.num_reg)
+            self.manager.get_var(name, type, self.type_to_width[type])
 
         if len(expr) >= 3:
             self.compile_expr(expr[1:]) # num x = 3 -> num x; x = 3

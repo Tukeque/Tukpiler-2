@@ -32,7 +32,11 @@ class Wrapped:
             var = self.value
             var.update()
 
-            return var.get()
+            temps = []
+            result = var.get(temps)
+            for x in temps: x.free()
+
+            return result
         else: # self.type == "imm":
             return self.value
 
@@ -92,7 +96,7 @@ class Var:
     def update(self):
         self.manager.update(self)
 
-    def get(self): # updated for pointers
+    def get(self, temps: list = None): # updated for pointers
         """
         Returns the value pointed to by the var, in a reg, whether or not its already stored in one
         """
@@ -105,14 +109,20 @@ class Var:
                     result = self.manager.get_reg(self.pointer, "num")
                     self.manager.emit(f"LOD {result.pointer.addr} {self.pointer.addr}")
 
+                    temps.append(result)
+
                     return result.pointer.addr
 
                 else: # self.pointer.type == "ram":
                     local = self.manager.get_reg(self.pointer, "num")
                     local.set(Wrapped("var", self)) # copy to local
 
+                    temps.append(local)
+
                     result = self.manager.get_reg(self.pointer, "num")
                     self.manager.emit(f"LOD {result.pointer.addr} {self.pointer.addr}")
+
+                    temps.append(result)
 
                     return result.pointer.addr
         else:
@@ -124,7 +134,12 @@ class Var:
                     local = self.manager.get_reg(self.pointer, "num")
                     local.set(Wrapped("var", self)) # copy to local
 
-                    return local.get()
+                    temps.append(local)
+
+                    temps2 = []
+                    result = local.get(temps2)
+                    for x in temps2: x.free()
+                    return result
             # todo silk
 
     def set(self, x: Wrapped):
@@ -157,6 +172,9 @@ class Var:
     def op(self, op: str, src1: Wrapped, src2: Wrapped):
         temps = []
         handled1 = src1.handle()
+
+        if src1.value == src2.value:
+            handled2 = handled1
         handled2 = src2.handle()
 
         if config.arch == "urcl":
