@@ -69,6 +69,7 @@ class Var:
         self.width   = width
         self.manager = manager
         self.freed   = False
+        self.altered = False
         self.references = references
 
     def archive(self):
@@ -106,6 +107,10 @@ class Var:
     def reference(self):
         self.references -= 1
         if self.references <= 0:
+            for var in self.manager.var_order:
+                if var.local == self and self.altered: # this variable is a local of some variable and the local is different than the variable
+                    var.set(Wrapped("var", self))
+
             self.free() # wont be used anymore, free
 
     def get(self) -> str: # todo add silk
