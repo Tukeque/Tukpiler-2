@@ -48,23 +48,28 @@ class Wrapped:
 
 class Pointer:
     def __init__(self, addr: str, type: str):
-        assert type in ["reg", "ram"]
+        assert type in ["reg", "ram", "mempoi", "regpoi", "stackpoi", "stack"]
 
-        self.addr = addr
+        self.addr = addr # MX, RX or SX (M1, R1, S1 for example)
         self.type = type
 
     def get_int_addr(self):
         return int(self.addr[1:])
 
 class Var:
-    def __init__(self, name: str, type: str, pointer: Pointer, width: int, manager, is_pointer: bool = False):
+    def __init__(self, name: str, type: str, kind: str, pointer: Pointer, width: int, references: int, manager):
+        assert kind in ["var", "temp"]
+
         self.name    = name
         self.type    = type
+        self.kind    = kind
         self.pointer = pointer
+        self.local   = None
+
         self.width   = width
         self.manager = manager
-
-        self.is_pointer = is_pointer
+        self.freed   = False
+        self.references = references
 
     def archive(self):
         if self.pointer.type == "reg":
@@ -93,54 +98,93 @@ class Var:
         self.manager.var_order.remove(self)
         self.manager.vars.pop(self.name)
 
+        self.freed = True
+
     def update(self):
         self.manager.update(self)
 
-    def get(self, temps: list = None): # updated for pointers
-        """
-        Returns the value pointed to by the var, in a reg, whether or not its already stored in one
-        """
+    def reference(self):
+        self.references -= 1
+        if self.references <= 0:
+            self.free() # wont be used anymore, free
 
+    def get(self) -> str: # todo add silk
         self.update()
+        result = ""
 
-        if self.is_pointer:
-            if config.arch == "urcl":
-                if self.pointer.type == "reg":
-                    result = self.manager.get_reg(self.pointer, "num")
-                    self.manager.emit(f"LOD {result.pointer.addr} {self.pointer.addr}")
+        def isfree(var) -> bool:
+            return var == None or var.freed
 
-                    temps.append(result)
+        if self.kind == "var":
+            if self.pointer.type == "reg":
+                if config.arch == "urcl":
+                    result = self.pointer.addr
 
-                    return result.pointer.addr
+            elif self.pointer.type == "ram":
+                if config.arch == "urcl":
+                    if isfree(self.local): # local isnt allocated
+                        self.local = self.manager.get_reg(random_name(), "num") # todo get_temp()
+                        self.local.set(Wrapped("var", self))
+                    else: # local already allocated
+                        pass
 
-                else: # self.pointer.type == "ram":
-                    local = self.manager.get_reg(self.pointer, "num")
-                    local.set(Wrapped("var", self)) # copy to local
+                    result = self.local.pointer.addr
 
-                    temps.append(local)
+            elif self.pointer.type == "regpoi":
+                if config.arch == "urcl":
+                    if isfree(self.local): # local isnt allocated
+                        self.local = self.manager.get_reg(random_name(), "num")
+                        self.manager.emit(f"LOD {self.local.pointer.addr} {self.pointer.addr}")
+                    else: # local already allocated
+                        pass
 
-                    result = self.manager.get_reg(self.pointer, "num")
-                    self.manager.emit(f"LOD {result.pointer.addr} {self.pointer.addr}")
+                    result = self.local.pointer.addr
 
-                    temps.append(result)
+            elif self.pointer.type == "mempoi":
+                if config.arch == "urcl":
+                    if isfree(self.local): # local isnt allocated
+                        midpoint = self.manager.get_reg(random_name(), "num")
+                        self.manager.emit(f"LOD {midpoint.pointer.addr} {self.pointer.addr}")
+                        midpoint.free()
 
-                    return result.pointer.addr
-        else:
-            if config.arch == "urcl":
-                if self.pointer.type == "reg":
-                    return self.pointer.addr
+                        self.local = self.manager.get_reg(random_name(), "num")
+                        self.manager.emit(f"LOD {self.local.pointer.addr} {midpoint.pointer.addr}")
+                    else: # local already allocated
+                        pass
 
-                else: # self.pointer.type == "ram":
-                    local = self.manager.get_reg(self.pointer, "num")
-                    local.set(Wrapped("var", self)) # copy to local
+                    result = self.local.pointer.addr
+            
+            elif self.pointer.type == "stack":
+                if config.arch == "urcl":
+                    if isfree(self.local): # local isnt allocated
+                        self.local = self.manager.get_reg(random_name(), "num")
+                        self.manager.emit(f"LLOD {self.local.pointer.addr} SP {self.pointer.get_int_addr() - self.manager.tos}")
+                    else:
+                        pass
 
-                    temps.append(local)
+                    result = self.local.pointer.addr
 
-                    temps2 = []
-                    result = local.get(temps2)
-                    for x in temps2: x.free()
-                    return result
-            # todo silk
+            elif self.pointer.type == "stackpoi":
+                if config.arch == "urcl":
+                    if isfree(self.local): # local isnt allocated
+                        midpoint = self.manager.get_reg(random_name(), "num")
+                        self.manager.emit(f"LLOD {midpoint.pointer.addr} SP {midpoint.pointer.addr}")
+                        midpoint.free()
+
+                        self.local = self.manager.get_reg(random_name(), "num")
+                        self.manager.emit(f"LOD {self.local.pointer.addr} {midpoint.pointer.addr}")
+                    else:
+                        pass
+
+                    result = self.local.pointer.addr
+
+        elif self.kind == "temp":
+            if self.pointer.type == "reg":
+                if config.arch == "urcl":
+                    result = self.pointer.addr
+
+        self.reference()
+        return result
 
     def set(self, x: Wrapped):
         if x.type == "var":
