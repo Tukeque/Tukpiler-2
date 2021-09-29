@@ -1,4 +1,4 @@
-regs = 8 # doesnt matter if using "silk"
+regs = 8 # doesnt matter if using "silk" # needs to be atleast 4 # 8 or more recommended for a better experience
 heap = 256 # size of the heap
 bits = 16 # bitlength of target arch
 modfix = True # just replaces # with M for mod's emulator to work
