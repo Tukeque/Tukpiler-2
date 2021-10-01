@@ -110,6 +110,9 @@ class Var:
             for var in self.manager.var_order:
                 if var.local == self and self.altered: # this variable is a local of some variable and the local is different than the variable
                     var.set(Wrapped("var", self))
+            else:
+                if self.local != None and self.local.freed != True: # local is allocated, must free too
+                    self.local.free()
 
             self.free() # wont be used anymore, free
 
@@ -127,7 +130,7 @@ class Var:
         elif self.pointer.type == "ram":
             if config.arch == "urcl":
                 if isfree(self.local): # local isnt allocated
-                    self.local = self.manager.get_reg(random_name(), "num") # todo get_temp()
+                    self.local = self.manager.get_temp(self.references + 1)
                     self.local.set(Wrapped("var", self))
                     self.local.altered = False
                 else: # local already allocated
@@ -138,7 +141,7 @@ class Var:
         elif self.pointer.type == "regpoi":
             if config.arch == "urcl":
                 if isfree(self.local): # local isnt allocated
-                    self.local = self.manager.get_reg(random_name(), "num")
+                    self.local = self.manager.get_temp(self.references)
                     self.manager.emit(f"LOD {self.local.pointer.addr} {self.pointer.addr}")
                 else: # local already allocated
                     pass
@@ -148,11 +151,11 @@ class Var:
         elif self.pointer.type == "mempoi":
             if config.arch == "urcl":
                 if isfree(self.local): # local isnt allocated
-                    midpoint = self.manager.get_reg(random_name(), "num")
+                    midpoint = self.manager.get_temp(1)
                     self.manager.emit(f"LOD {midpoint.pointer.addr} {self.pointer.addr}")
                     midpoint.free()
 
-                    self.local = self.manager.get_reg(random_name(), "num")
+                    self.local = self.manager.get_temp(self.references)
                     self.manager.emit(f"LOD {self.local.pointer.addr} {midpoint.pointer.addr}")
                 else: # local already allocated
                     pass
@@ -162,7 +165,7 @@ class Var:
         elif self.pointer.type == "stack":
             if config.arch == "urcl":
                 if isfree(self.local): # local isnt allocated
-                    self.local = self.manager.get_reg(random_name(), "num")
+                    self.local = self.manager.get_temp(self.references)
                     self.manager.emit(f"LLOD {self.local.pointer.addr} SP {self.pointer.get_int_addr() - self.manager.tos}")
                 else:
                     pass
@@ -172,11 +175,11 @@ class Var:
         elif self.pointer.type == "stackpoi":
             if config.arch == "urcl":
                 if isfree(self.local): # local isnt allocated
-                    midpoint = self.manager.get_reg(random_name(), "num")
+                    midpoint = self.manager.get_temp(1)
                     self.manager.emit(f"LLOD {midpoint.pointer.addr} SP {midpoint.pointer.addr}")
                     midpoint.free()
 
-                    self.local = self.manager.get_reg(random_name(), "num")
+                    self.local = self.manager.get_temp(self.references)
                     self.manager.emit(f"LOD {self.local.pointer.addr} {midpoint.pointer.addr}")
                 else:
                     pass
@@ -202,7 +205,7 @@ class Var:
                         self.manager.emit(f"STR {self.pointer.addr} {var.pointer.addr}")
 
                     elif var.pointer.type == "mempoi":
-                        midpoint = self.manager.get_reg(random_name(), "num")
+                        midpoint = self.manager.get_temp(1)
 
                         self.manager.emit(f"LOD {midpoint.pointer.addr} {var.pointer.addr}")
                         self.manager.emit(f"CPY {self.pointer.addr} {midpoint.pointer.addr}")
@@ -226,7 +229,7 @@ class Var:
                         self.manager.emit(f"MOV {self.pointer.addr} {var.pointer.addr}")
 
                     elif var.pointer.type == "mempoi":
-                        midpoint = self.manager.get_reg(random_name(), "num")
+                        midpoint = self.manager.get_temp(1)
 
                         self.manager.emit(f"LOD {midpoint.pointer.addr} {var.pointer.addr}")
                         self.manager.emit(f"LOD {self.pointer.addr} {midpoint.pointer.addr}")
@@ -244,7 +247,7 @@ class Var:
 
                 elif self.pointer.type == "mempoi":
                     if var.pointer.type == "ram":
-                        midpoint = self.manager.get_reg(random_name(), "num")
+                        midpoint = self.manager.get_temp(1)
 
                         self.manager.emit(f"LOD {midpoint.pointer.addr} {self.pointer.addr}")
                         self.manager.emit(f"CPY {midpoint.pointer.addr} {var.pointer.addr}")
@@ -252,7 +255,7 @@ class Var:
                         midpoint.free()
 
                     elif var.pointer.type == "reg":
-                        midpoint = self.manager.get_reg(random_name(), "num")
+                        midpoint = self.manager.get_temp(1)
 
                         self.manager.emit(f"LOD {midpoint.pointer.addr} {self.pointer.addr}")
                         self.manager.emit(f"STR {midpoint.pointer.addr} {var.pointer.addr}")
@@ -260,8 +263,8 @@ class Var:
                         midpoint.free()
 
                     elif var.pointer.type == "mempoi":
-                        midpoint1 = self.manager.get_reg(random_name(), "num")
-                        midpoint2 = self.manager.get_reg(random_name(), "num")
+                        midpoint1 = self.manager.get_temp(1)
+                        midpoint2 = self.manager.get_temp(1)
 
                         self.manager.emit(f"LOD {midpoint1.pointer.addr} {self.pointer.addr}")
                         self.manager.emit(f"LOD {midpoint2.pointer.addr} {var.pointer.addr}")
@@ -271,7 +274,7 @@ class Var:
                         midpoint2.free()
 
                     elif var.pointer.type == "regpoi":
-                        midpoint = self.manager.get_reg(random_name(), "num")
+                        midpoint = self.manager.get_temp(1)
 
                         self.manager.emit(f"LOD {midpoint.pointer.addr} {self.pointer.addr}")
                         self.manager.emit(f"CPY {midpoint.pointer.addr} {var.pointer.addr}")
@@ -292,7 +295,7 @@ class Var:
                         self.manager.emit(f"CPY {self.pointer.addr} {var.pointer.addr}")
 
                     elif var.pointer.type == "mempoi":
-                        midpoint = self.manager.get_reg(random_name(), "num")
+                        midpoint = self.manager.get_temp(1)
 
                         self.manager.emit(f"LOD {midpoint.pointer.addr} {self.pointer.addr}")
                         self.manager.emit(f"CPY {midpoint.pointer.addr} {var.pointer.addr}")
@@ -326,7 +329,7 @@ class Var:
                     self.manager.emit(f"IMM {self.pointer.addr} {imm}")
 
                 elif self.pointer.type == "mempoi":
-                    midpoint = self.manager.get_reg(random_name(), "num")
+                    midpoint = self.manager.get_temp(1)
 
                     self.manager.emit(f"LOD {midpoint.pointer.addr} {self.pointer.addr}")
                     self.manager.emit(f"STR {midpoint.pointer.addr} {imm}")
