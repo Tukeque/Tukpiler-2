@@ -2,6 +2,7 @@ from manager import Manager
 from var import Var, Func
 from error import error
 from lexer import Reader
+from parse import Parser
 import config
 
 class Compiler:
@@ -17,7 +18,7 @@ class Compiler:
 
     def __init__(self, parser):
         self.manager = Manager(self.vars, self.funcs, self.type_to_width)
-        self.parser = parser
+        self.parser: Parser = parser
 
     def get_var_names(self) -> list[str]:
         return [x for x in self.vars]
@@ -29,7 +30,8 @@ class Compiler:
         if type == "array":
             error("arrays aren't implemented yet")
         else: # anything else (num, none, MyObject, ...)
-            self.manager.get_var(name, type, self.type_to_width[type])
+            references = self.parser.tokens.elements.count(name)
+            self.manager.get_var(name, type, self.type_to_width[type], references)
 
         if len(expr) >= 3:
             self.compile_expr(expr[1:]) # num x = 3 -> num x; x = 3
