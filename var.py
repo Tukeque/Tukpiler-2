@@ -313,18 +313,34 @@ class Var:
 
                 elif self.pointer.type == "stackpoi":
                     pass
-
-                
             # todo silk
 
         else: # x.type == "imm":
             imm = x.value
 
             if config.arch == "urcl":
-                if self.pointer.type == "ram":   op = "STR"
-                elif self.pointer.type == "reg": op = "STR"
-                
-                self.manager.emit(f"{op} {self.pointer.addr} {imm}")
+                if self.pointer.type == "ram":
+                    self.manager.emit(f"STR {self.pointer.addr} {imm}")
+
+                elif self.pointer.type == "reg":
+                    self.manager.emit(f"IMM {self.pointer.addr} {imm}")
+
+                elif self.pointer.type == "mempoi":
+                    midpoint = self.manager.get_reg(random_name(), "num")
+
+                    self.manager.emit(f"LOD {midpoint.pointer.addr} {self.pointer.addr}")
+                    self.manager.emit(f"STR {midpoint.pointer.addr} {imm}")
+
+                    midpoint.free()
+
+                elif self.pointer.type == "regpoi":
+                    self.manager.emit(f"STR {self.pointer.addr} {imm}")
+
+                elif self.pointer.type == "stack":
+                    pass
+
+                elif self.pointer.type == "stackpoi":
+                    pass
             # todo silk
 
         self.altered = True
@@ -381,7 +397,7 @@ class Var:
                 self.manager.emit(f"POP {self.pointer.addr}")
         # todo silk
 
-class Func:
+class Func: # todo remake
     def __init__(self, name, args, return_type, manager):
         self.name = name
         self.args: list[list[str]] = args
