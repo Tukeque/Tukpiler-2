@@ -32,9 +32,7 @@ class Wrapped:
             var = self.value
             var.update()
 
-            temps = []
-            result = var.get(temps)
-            for x in temps: x.free()
+            result = var.get()
 
             return result
         else: # self.type == "imm":
@@ -91,15 +89,18 @@ class Var:
         pass # todo
 
     def free(self):
-        if self.pointer.type == "reg":
-            self.manager.available_reg.append(self.pointer.get_int_addr())
-        else: # self.pointer.type == "ram":
-            self.manager.available_ram.append(self.pointer.get_int_addr())
+        if not self.freed:
+            if self.pointer.type == "reg":
+                self.manager.available_reg.append(self.pointer.get_int_addr())
+            else: # self.pointer.type == "ram":
+                self.manager.available_ram.append(self.pointer.get_int_addr())
 
-        self.manager.var_order.remove(self)
-        self.manager.vars.pop(self.name)
+            self.manager.var_order.remove(self)
+            self.manager.vars.pop(self.name)
 
-        self.freed = True
+            self.freed = True
+        else:
+            debug("freed a variable which was already freed (perhaps by ARC)")
 
     def update(self):
         self.manager.update(self)
@@ -347,58 +348,28 @@ class Var:
             # todo silk
 
         self.altered = True
+        self.reference()
 
-    def op(self, op: str, src1: Wrapped, src2: Wrapped): # todo
-        temps = []
-        handled1 = src1.handle()
-
-        if src1.value == src2.value:
-            handled2 = handled1
-        handled2 = src2.handle()
-
+    def op(self, op: str, src1: Wrapped, src2: Wrapped):
         if config.arch == "urcl":
-            if self.pointer.type == "ram":
-                temp = self.manager.get_reg(random_name(), "num")
+            if self.pointer.type == "reg":
+                # handle
+                handled1 = src1.handle()
+
+                if src1.value == src2.value:
+                    handled2 = handled1
+                else:
+                    handled2 = src2.handle()
+
+                debug(f"op {op} {[handled1, handled2]}")
+                self.manager.emit(f"{op_to_urcl[op]} {self.pointer.addr} {handled1} {handled2}")
+            else:
+                temp = self.manager.get_temp(2)
                 temp.op(op, src1, src2)
                 self.set(Wrapped("var", temp))
-            else: # self.pointer.type == "reg":
-                debug([handled1, handled2])
-                self.manager.emit(f"{op_to_urcl[op]} {self.pointer.addr} {handled1} {handled2}")
         # todo silk
 
-        for var in temps:
-            var.free()
-
-    def push(self):
-        self.update()
-        self.manager.tos += 1
-
-        if self.is_pointer:
-            if config.arch == "urcl":
-                if self.pointer.type == "ram" and self.type == "num":
-                    temp = self.manager.get_reg(random_name(), "num")
-                    temp.set(Wrapped("var", self))
-
-                    self.manager.emit(f"PSH {temp.pointer.addr}")
-
-                else: # self.pointer.type == "reg" or "ram":
-                    self.manager.emit(f"PSH {self.pointer.addr}")
-            # todo silk
-
-    def pop(self):
-        self.update()
-        self.manager.tos -= 1
-
-        if config.arch == "urcl":
-            if self.pointer.type == "ram":
-                temp = self.manager.get_reg(random_name(), "num")
-            
-                self.manager.emit(f"POP {temp.pointer.addr}")
-                self.set(Wrapped("var", temp))
-
-            else: # self.pointer.type == "reg":
-                self.manager.emit(f"POP {self.pointer.addr}")
-        # todo silk
+        self.reference()
 
 class Func: # todo remake
     def __init__(self, name, args, return_type, manager):
