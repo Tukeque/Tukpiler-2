@@ -3,7 +3,7 @@ import config
 errors = []
 
 def error(msg: str):
-    print(f"error! -> {msg}")
+    print(f"<!!error!!> -> {msg}")
     errors.append(msg)
 
 def debug(msg):
