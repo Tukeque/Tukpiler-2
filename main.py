@@ -14,7 +14,7 @@ out   = f"output.{config.arch}"
 DEBUG = False
 not_found = ""
 
-if len(args) >= 2:
+if len(args) >= 3:
     # command line mode
 
     def get_operand() -> str:
@@ -58,7 +58,7 @@ else:
     if file == "":
         file = input("file to compile: ")
     if out == "":
-        file = input("where to store the result?: ")
+        out = input("where to store the result?: ")
 
     not_found = "{file} isnt a file! check again that its in the same directory as main.py"
     

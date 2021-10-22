@@ -30,16 +30,23 @@ class Wrapped:
         self.type = type
         self.value = value
 
-    def handle(self):
+    def handle(self, hold: bool = True):
         if self.type == "var":
             var = self.value
             result = var.get()
+
+            if hold:
+                var.references += 1
 
             var.reference()
 
             return result
         else: # self.type == "imm":
             return self.value
+
+    def release(self):
+        if self.type == "var":
+            self.value.reference()
 
     def from_string(x: str, vars: dict):
         if x in vars:
@@ -379,14 +386,18 @@ class Var:
         if config.arch == "urcl":
             if target.pointer.type == "reg":
                 # handle
-                handled1 = src1.handle()
+                handled1 = src1.handle(hold = True) # it isnt necesary to put the hold but its nice i guess
                 if src1.value == src2.value:
                     handled2 = handled1
                 else:
-                    handled2 = src2.handle()
+                    handled2 = src2.handle(hold = True)
 
                 debug(f"op {self.name}({self.pointer.addr}) = {op} {[handled1, handled2]}")
                 self.manager.emit(f"{op_to_urcl[op]} {target.pointer.addr} {handled1} {handled2}")
+
+                src1.release()
+                if not (handled2 is handled1): # theyre different
+                    src2.release()
             else:
                 temp = self.manager.get_temp(2)
                 temp.op(op, src1, src2)
