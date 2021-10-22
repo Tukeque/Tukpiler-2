@@ -3,6 +3,7 @@ from parse    import Parser
 from compiler import Compiler
 from sys      import argv as args
 from os       import path
+from rich     import print
 import config
 
 print("Tukpiler 2 2021\n")
