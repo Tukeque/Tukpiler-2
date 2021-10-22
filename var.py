@@ -9,6 +9,9 @@ def random_salt() -> str:
 def random_name() -> str:
     return f"RANDOM_{random_salt()}"
 
+def random_plus_name(name: str) -> str:
+    return f"{name}_{random_salt()}"
+
 op_to_urcl = {
     "+": "ADD",
     "-": "SUB",
@@ -30,9 +33,9 @@ class Wrapped:
     def handle(self):
         if self.type == "var":
             var = self.value
-            var.update()
-
             result = var.get()
+
+            var.reference()
 
             return result
         else: # self.type == "imm":
@@ -53,6 +56,9 @@ class Pointer:
 
     def get_int_addr(self):
         return int(self.addr[1:])
+
+def isfree(var) -> bool:
+    return var == None or var.freed
 
 class Var:
     def __init__(self, name: str, type: str, kind: str, pointer: Pointer, width: int, references: int, manager):
@@ -107,7 +113,7 @@ class Var:
 
     def reference(self):
         self.references -= 1
-        if self.references <= 0:
+        if self.references == 0:
             for var in self.manager.var_order:
                 if var.local == self and self.altered: # this variable is a local of some variable and the local is different than the variable
                     var.set(Wrapped("var", self))
@@ -115,14 +121,14 @@ class Var:
                 if self.local != None and self.local.freed != True: # local is allocated, must free too
                     self.local.free()
 
+            debug(f"ARC free {self.name}")
             self.free() # wont be used anymore, free
+        elif self.references < 0:
+            error(f"using a variable ({self.name}) when its already exceeded its references")
 
     def get(self) -> str: # todo add silk
         self.update()
         result = ""
-
-        def isfree(var) -> bool:
-            return var == None or var.freed
 
         if self.pointer.type == "reg":
             if config.arch == "urcl":
@@ -131,7 +137,8 @@ class Var:
         elif self.pointer.type == "ram":
             if config.arch == "urcl":
                 if isfree(self.local): # local isnt allocated
-                    self.local = self.manager.get_temp(self.references + 1)
+                    self.local = self.manager.get_temp(self.references + 1, "LOCAL")
+                    self.references += 1
                     self.local.set(Wrapped("var", self))
                     self.local.altered = False
                 else: # local already allocated
@@ -142,7 +149,7 @@ class Var:
         elif self.pointer.type == "regpoi":
             if config.arch == "urcl":
                 if isfree(self.local): # local isnt allocated
-                    self.local = self.manager.get_temp(self.references)
+                    self.local = self.manager.get_temp(self.references, "LOCAL")
                     self.manager.emit(f"LOD {self.local.pointer.addr} {self.pointer.addr}")
                 else: # local already allocated
                     pass
@@ -156,7 +163,7 @@ class Var:
                     self.manager.emit(f"LOD {midpoint.pointer.addr} {self.pointer.addr}")
                     midpoint.free()
 
-                    self.local = self.manager.get_temp(self.references)
+                    self.local = self.manager.get_temp(self.references, "LOCAL")
                     self.manager.emit(f"LOD {self.local.pointer.addr} {midpoint.pointer.addr}")
                 else: # local already allocated
                     pass
@@ -166,7 +173,7 @@ class Var:
         elif self.pointer.type == "stack":
             if config.arch == "urcl":
                 if isfree(self.local): # local isnt allocated
-                    self.local = self.manager.get_temp(self.references)
+                    self.local = self.manager.get_temp(self.references, "LOCAL")
                     self.manager.emit(f"LLOD {self.local.pointer.addr} SP {self.pointer.get_int_addr() - self.manager.tos}")
                 else:
                     pass
@@ -180,41 +187,45 @@ class Var:
                     self.manager.emit(f"LLOD {midpoint.pointer.addr} SP {midpoint.pointer.addr}")
                     midpoint.free()
 
-                    self.local = self.manager.get_temp(self.references)
+                    self.local = self.manager.get_temp(self.references, "LOCAL")
                     self.manager.emit(f"LOD {self.local.pointer.addr} {midpoint.pointer.addr}")
                 else:
                     pass
 
                 result = self.local.pointer.addr
 
-        self.reference()
         return result
 
     def set(self, x: Wrapped): # todo stacks
+        target = self
+
+        if not isfree(self.local):
+            target = self.local
+
+        self.update()
 
         if x.type == "var":
             var = x.value
-            
-            self.update(); var.update()
+            var.update()
 
             if config.arch == "urcl":
-                if self.pointer.type == "ram":
+                if target.pointer.type == "ram":
                     if var.pointer.type == "ram":
-                        self.manager.emit(f"CPY {self.pointer.addr} {var.pointer.addr}")
+                        self.manager.emit(f"CPY {target.pointer.addr} {var.pointer.addr}")
 
                     elif var.pointer.type == "reg":
-                        self.manager.emit(f"STR {self.pointer.addr} {var.pointer.addr}")
+                        self.manager.emit(f"STR {target.pointer.addr} {var.pointer.addr}")
 
                     elif var.pointer.type == "mempoi":
                         midpoint = self.manager.get_temp(1)
 
                         self.manager.emit(f"LOD {midpoint.pointer.addr} {var.pointer.addr}")
-                        self.manager.emit(f"CPY {self.pointer.addr} {midpoint.pointer.addr}")
+                        self.manager.emit(f"CPY {target.pointer.addr} {midpoint.pointer.addr}")
 
                         midpoint.free()
 
                     elif var.pointer.type == "regpoi":
-                        self.manager.emit(f"CPY {self.pointer.addr} {var.pointer.addr}")
+                        self.manager.emit(f"CPY {target.pointer.addr} {var.pointer.addr}")
 
                     elif var.pointer.type == "stack":
                         pass
@@ -222,23 +233,23 @@ class Var:
                     elif var.pointer.type == "stackpoi":
                         pass
 
-                elif self.pointer.type == "reg":
+                elif target.pointer.type == "reg":
                     if var.pointer.type == "ram":
-                        self.manager.emit(f"LOD {self.pointer.addr} {var.pointer.addr}")
+                        self.manager.emit(f"LOD {target.pointer.addr} {var.pointer.addr}")
 
                     elif var.pointer.type == "reg":
-                        self.manager.emit(f"MOV {self.pointer.addr} {var.pointer.addr}")
+                        self.manager.emit(f"MOV {target.pointer.addr} {var.pointer.addr}")
 
                     elif var.pointer.type == "mempoi":
                         midpoint = self.manager.get_temp(1)
 
                         self.manager.emit(f"LOD {midpoint.pointer.addr} {var.pointer.addr}")
-                        self.manager.emit(f"LOD {self.pointer.addr} {midpoint.pointer.addr}")
+                        self.manager.emit(f"LOD {target.pointer.addr} {midpoint.pointer.addr}")
 
                         midpoint.free()
 
                     elif var.pointer.type == "regpoi":
-                        self.manager.emit(f"LOD {self.pointer.addr} {var.pointer.addr}")
+                        self.manager.emit(f"LOD {target.pointer.addr} {var.pointer.addr}")
 
                     elif var.pointer.type == "stack":
                         pass
@@ -246,11 +257,11 @@ class Var:
                     elif var.pointer.type == "stackpoi":
                         pass
 
-                elif self.pointer.type == "mempoi":
+                elif target.pointer.type == "mempoi":
                     if var.pointer.type == "ram":
                         midpoint = self.manager.get_temp(1)
 
-                        self.manager.emit(f"LOD {midpoint.pointer.addr} {self.pointer.addr}")
+                        self.manager.emit(f"LOD {midpoint.pointer.addr} {target.pointer.addr}")
                         self.manager.emit(f"CPY {midpoint.pointer.addr} {var.pointer.addr}")
 
                         midpoint.free()
@@ -258,7 +269,7 @@ class Var:
                     elif var.pointer.type == "reg":
                         midpoint = self.manager.get_temp(1)
 
-                        self.manager.emit(f"LOD {midpoint.pointer.addr} {self.pointer.addr}")
+                        self.manager.emit(f"LOD {midpoint.pointer.addr} {target.pointer.addr}")
                         self.manager.emit(f"STR {midpoint.pointer.addr} {var.pointer.addr}")
 
                         midpoint.free()
@@ -267,7 +278,7 @@ class Var:
                         midpoint1 = self.manager.get_temp(1)
                         midpoint2 = self.manager.get_temp(1)
 
-                        self.manager.emit(f"LOD {midpoint1.pointer.addr} {self.pointer.addr}")
+                        self.manager.emit(f"LOD {midpoint1.pointer.addr} {target.pointer.addr}")
                         self.manager.emit(f"LOD {midpoint2.pointer.addr} {var.pointer.addr}")
                         self.manager.emit(f"CPY {midpoint1.pointer.addr} {midpoint2.pointer.addr}")
 
@@ -277,7 +288,7 @@ class Var:
                     elif var.pointer.type == "regpoi":
                         midpoint = self.manager.get_temp(1)
 
-                        self.manager.emit(f"LOD {midpoint.pointer.addr} {self.pointer.addr}")
+                        self.manager.emit(f"LOD {midpoint.pointer.addr} {target.pointer.addr}")
                         self.manager.emit(f"CPY {midpoint.pointer.addr} {var.pointer.addr}")
 
                         midpoint.free()
@@ -288,23 +299,23 @@ class Var:
                     elif var.pointer.type == "stackpoi":
                         pass
 
-                elif self.pointer.type == "regpoi":
+                elif target.pointer.type == "regpoi":
                     if var.pointer.type == "ram":
-                        self.manager.emit(f"STR {self.pointer.addr} {var.pointer.addr}")
+                        self.manager.emit(f"STR {target.pointer.addr} {var.pointer.addr}")
 
                     elif var.pointer.type == "reg":
-                        self.manager.emit(f"CPY {self.pointer.addr} {var.pointer.addr}")
+                        self.manager.emit(f"CPY {target.pointer.addr} {var.pointer.addr}")
 
                     elif var.pointer.type == "mempoi":
                         midpoint = self.manager.get_temp(1)
 
-                        self.manager.emit(f"LOD {midpoint.pointer.addr} {self.pointer.addr}")
+                        self.manager.emit(f"LOD {midpoint.pointer.addr} {target.pointer.addr}")
                         self.manager.emit(f"CPY {midpoint.pointer.addr} {var.pointer.addr}")
 
                         midpoint.free()
 
                     elif var.pointer.type == "regpoi":
-                        self.manager.emit(f"CPY {self.pointer.addr} {var.pointer.addr}")
+                        self.manager.emit(f"CPY {target.pointer.addr} {var.pointer.addr}")
 
                     elif var.pointer.type == "stack":
                         pass
@@ -312,12 +323,14 @@ class Var:
                     elif var.pointer.type == "stackpoi":
                         pass
 
-                elif self.pointer.type == "stack":
+                elif target.pointer.type == "stack":
                     pass
 
-                elif self.pointer.type == "stackpoi":
+                elif target.pointer.type == "stackpoi":
                     pass
             # todo silk
+
+            var.reference()
 
         else: # x.type == "imm":
             imm = x.value
@@ -326,7 +339,7 @@ class Var:
                 if self.pointer.type == "ram":
                     self.manager.emit(f"STR {self.pointer.addr} {imm}")
 
-                elif self.pointer.type == "reg":
+                elif self.ptargetinter.type == "reg":
                     self.manager.emit(f"IMM {self.pointer.addr} {imm}")
 
                 elif self.pointer.type == "mempoi":
@@ -351,24 +364,37 @@ class Var:
         self.reference()
 
     def op(self, op: str, src1: Wrapped, src2: Wrapped):
+        self.manager.emit(f"// {self.name} = {src1.value.name} {op} {src2.value.name}")
+
+        target = self
+
+        if not isfree(self.local):
+            target = self.local
+        elif self.pointer.type != "reg": # local isnt allocated and need local
+            #//self.get()
+            #^ nope because we want to allocate the local but not get the value in there
+            self.local = self.manager.get_temp(self.references, "LOCAL")
+            target = self.local
+
         if config.arch == "urcl":
-            if self.pointer.type == "reg":
+            if target.pointer.type == "reg":
                 # handle
                 handled1 = src1.handle()
-
                 if src1.value == src2.value:
                     handled2 = handled1
                 else:
                     handled2 = src2.handle()
 
-                debug(f"op {op} {[handled1, handled2]}")
-                self.manager.emit(f"{op_to_urcl[op]} {self.pointer.addr} {handled1} {handled2}")
+                debug(f"op {self.name}({self.pointer.addr}) = {op} {[handled1, handled2]}")
+                self.manager.emit(f"{op_to_urcl[op]} {target.pointer.addr} {handled1} {handled2}")
             else:
                 temp = self.manager.get_temp(2)
                 temp.op(op, src1, src2)
-                self.set(Wrapped("var", temp))
+                target.references += 1
+                target.set(Wrapped("var", temp))
         # todo silk
 
+        self.altered = True
         self.reference()
 
 class Func: # todo remake
