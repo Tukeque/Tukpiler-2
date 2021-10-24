@@ -87,4 +87,7 @@ compiler = Compiler(parser)
 compiler.compile(exprs)
 
 #* output
-print(compiler.manager.main) # todo compiler.manager.save("output.urcl")
+print("[green]OUTPUT:")
+for line in compiler.manager.main:
+    print(line)
+# todo compiler.manager.save("output.urcl")
