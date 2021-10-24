@@ -75,7 +75,9 @@ class Reader(Generic[T]):
         return self
 
     def __repr__(self) -> str:
-        return "[" + ", ".join([repr(x) for x in self.elements]) + "]"
+        representation = "[" + ", ".join([repr(x) for x in self.elements]) + "]"
+        #//print(representation)
+        return representation
 
     def split(self, splitter: T) -> list[list[T]]:
         result = [[]]
