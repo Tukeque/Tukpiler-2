@@ -3,7 +3,7 @@ from rich import print
 
 errors = []
 
-def error(msg: str):
+def error(msg):
     print(f"[red]<!!error!!> -> {msg}")
     errors.append(msg)
 
