@@ -371,7 +371,7 @@ class Var:
         self.reference()
 
     def op(self, op: str, src1: Wrapped, src2: Wrapped):
-        self.manager.emit(f"// {self.name} = {src1.value.name} {op} {src2.value.name}")
+        self.manager.emit(f"// {self.name} = {src1.value if type(src1.value) is str else src1.value.name} {op} {src2.value if type(src2.value) is str else src2.value.name}")
 
         target = self
 
