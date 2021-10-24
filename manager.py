@@ -160,7 +160,8 @@ class Manager:
 
     @classmethod
     def shunt(cls, tokens: lexer.Reader[Token]) -> lexer.Reader[Token]: # returns in RPN
-        debug(f"shunting {tokens}")
+        print(f"shunting {tokens}") # idk why doesnt work with debug
+
         operators: list[cls.Token] = []
         output   : list[cls.Token] = []
 
@@ -199,7 +200,7 @@ class Manager:
         return lexer.Reader(output)
 
     def emit_rpn(self, rpn: lexer.Reader[Token], ret_var: var.Var, vars: dict[str, var.Var], ret: bool = False):
-        debug("emitting rpn")
+        print(f"emitting rpn {rpn}")
 
         if rpn.length() == 0: return ret_var
         operands: list[self.Token] = []
@@ -237,9 +238,10 @@ class Manager:
 
                     operands.append(self.Token("var", [result.name], temp))
                 else: # consts
-                    eval(f"operands.append(self.Shunting.Token('imm', [str(int(a.get() {token.get()} int(a.get()))]))")
+                    eval(f"operands.append(self.Token('imm', [str(int(a.get()) {token.get()} int(a.get()))]))")
 
             elif token.type == "unary":
+                print("[red]UNARY!")
                 x = operands.pop()
 
                 if x.type != "imm":
