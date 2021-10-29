@@ -172,7 +172,7 @@ class Manager:
                 output.append(token)
 
             elif token.type == "op":
-                while (len(operators) >= 1 and operators[-1].get() != "(") and (operators[-1].precedence > token.precedence or (operators[-1].precedence == token.precedence and token.associativity == "left")):
+                while (len(operators) >= 1 and operators[-1].get() != "(") and (operators[-1].precedence >= token.precedence or (operators[-1].precedence == token.precedence and token.associativity == "left")):
                     output.append(operators.pop())
 
                 operators.append(token)
