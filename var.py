@@ -83,6 +83,8 @@ class Var:
         self.altered = False
         self.references = references
 
+        self.doesARC = True
+
     def archive(self):
         if self.pointer.type == "reg":
             new = self.manager.get_mem(random_name(), self.type, self.width)
@@ -119,19 +121,20 @@ class Var:
         self.manager.update(self)
 
     def reference(self):
-        self.references -= 1
-        if self.references == 0:
-            for var in self.manager.var_order:
-                if var.local == self and self.altered: # this variable is a local of some variable and the local is different than the variable
-                    var.set(Wrapped("var", self))
-            else:
-                if self.local != None and self.local.freed != True: # local is allocated, must free too
-                    self.local.free()
+        if self.doesARC:
+            self.references -= 1
+            if self.references == 0:
+                for var in self.manager.var_order:
+                    if var.local == self and self.altered: # this variable is a local of some   variable and the local is different than the variable
+                        var.set(Wrapped("var", self))
+                else:
+                    if self.local != None and self.local.freed != True: # local is allocated,   must free too
+                        self.local.free()
 
-            debug(f"ARC free {self.name}")
-            self.free() # wont be used anymore, free
-        elif self.references < 0:
-            error(f"using a variable ({self.name}) when its already exceeded its references")
+                debug(f"ARC free {self.name}")
+                self.free() # wont be used anymore, free
+            elif self.references < 0:
+                error(f"using a variable ({self.name}) when its already exceeded its references")
 
     def get(self) -> str: # todo add silk
         self.update()
