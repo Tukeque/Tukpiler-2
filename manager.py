@@ -22,21 +22,21 @@ class Manager:
         self.funcs = funcs
         self.type_to_width = type_to_width
 
-    def get_reg(self, name: str, references: int, kind: str = "temp") -> var.Var:
+    def get_reg(self, name: str, kind: str = "temp") -> var.Var:
         self.available_reg.sort()
 
         if len(self.available_reg) >= 1: # has space
             first = self.available_reg.pop(0)
-            return self.var(var.Var(name, "num", kind, var.Pointer(f"R{first}", "reg"), 1, references, self))
+            return self.var(var.Var(name, "num", kind, var.Pointer(f"R{first}", "reg"), 1, self))
 
         else: # no space, must archive
             for i in range(len(self.var_order)):
                 if self.var_order[i].pointer.type == "reg":
                     new_pointer = self.var_order[i].archive()
 
-                    return self.var(var.Var(name, "num", kind, new_pointer, 1, references, self))
+                    return self.var(var.Var(name, "num", kind, new_pointer, 1, self))
 
-    def get_mem(self, name: str, type: str, kind: str, width: int, references: int) -> var.Var:
+    def get_mem(self, name: str, type: str, kind: str, width: int) -> var.Var:
         self.available_ram = sorted(self.available_ram)
 
         if len(self.available_ram) >= width:
@@ -44,22 +44,22 @@ class Manager:
             first = self.available_ram[0]
             self.available_ram = self.available_ram[width:]
 
-            return self.var(var.Var(name, type, kind, var.Pointer(f"M{first}", "ram"), width, references, self))
+            return self.var(var.Var(name, type, kind, var.Pointer(f"M{first}", "ram"), width, self))
             #error("memory didnt free in a way to fit a variable in consecutive addresses") # todo make it check for this in every ram address free and restructure if else
         else:
             error("ran out of memory") # no space (,_,)
 
-    def get_var(self, name: str, type: str, width: int, references: int, kind: str = "var") -> var.Var:
+    def get_var(self, name: str, type: str, width: int, kind: str = "var") -> var.Var:
         if type != "none": # goes in mem
-            return self.get_mem(name, type, kind, width, references)
+            return self.get_mem(name, type, kind, width)
         else: # type == "none": # goes at M0
-            return self.var(var.Var(name, "none", kind, var.Pointer("M0", "ram"), 1, references, self))
+            return self.var(var.Var(name, "none", kind, var.Pointer("M0", "ram"), 1, self))
 
-    def get_temp(self, references: int, name: str = "RANDOM") -> var.Var:
+    def get_temp(self, name: str = "RANDOM") -> var.Var:
         if config.arch == "urcl":
-            return self.get_reg(var.random_plus_name(name), references)
+            return self.get_reg(var.random_plus_name(name))
         elif config.arch == "silk":
-            return self.get_mem(var.random_plus_name(name), "num", "temp", 1, references)
+            return self.get_mem(var.random_plus_name(name), "num", "temp", 1)
 
     def emit(self, x, func: bool = False):
         debug(f"emitting {x}")
@@ -224,7 +224,7 @@ class Manager:
                             # save at ret_var
                             result = ret_var
                         else: # save at temp
-                            result = self.get_temp(2**32)
+                            result = self.get_temp()
                             temp = True
 
                         result.op(token.get(), var.Wrapped.from_string(a.get(), vars), var.Wrapped.from_string(b.get(), vars))
