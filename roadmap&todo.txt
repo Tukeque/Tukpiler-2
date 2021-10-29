@@ -1,0 +1,13 @@
+* ROADMAP:
+[x] variables
+[ ] functions
+[ ] conditional statements
+[ ] booleans?
+[ ] pointers
+[ ] switch statements
+[ ] classes
+[ ] libraries (import & using)
+
+* TODO:
+[ ] start writing functions
+[ ] add pointer & referincing support for parser and lexer
