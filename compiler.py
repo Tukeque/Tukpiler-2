@@ -3,6 +3,7 @@ from var import Var, Func
 from error import error
 from lexer import Reader
 from parse import Parser
+from copy import deepcopy as copy
 import config
 
 class Compiler:
@@ -49,73 +50,44 @@ class Compiler:
             self.declare(expr) # forward
 
         elif expr[0] == "return":
-            self.manager.evaluate(self.manager.make_tokens(expr[1:]), self.vars, ret = True)
+            self.manager.evaluate(self.manager.make_tokens(expr[1:], [], self.get_var_names()), self.vars, ret = True)
 
         # todo miscs like in, out, pop?, push?, halt,
         #? ^ handle when calling functions.
 
     def compile_func(self, expr: list[str]):
-        """
-        global funcrcl, func_name, func_ret_addr, vars
-        print(f"compiling function {tokens}")
-        #function add ( num x , num y ) - > num { ... }
-
-        name = tokens[1]
-        func_name = name
-        args = parse.split_list(tokens[tokens.index("(") + 1:tokens.index(")")], ",")
-        print(args)
-        return_type = tokens[tokens.index(")") + 3]
-
-        funcs[name] = Func(name, args, return_type)
-        funcrcl.append(f".function_{name}")
-        arg_table: dict[str, str] = {}
-
-        # return adress stack fix
-        return_address = get_reg()
-        funcrcl.append(f"POP {return_address}")
-        func_ret_addr = return_address
-
-        # extract arguments' pointers and create/overwrite the variables
-        before = copy(vars)
-        for arg in args:
-            reg = get_reg()
-            arg_table[arg[1]] = reg # setup an argument to reg table
-            funcrcl.append(f"POP {reg}")
-            vars[arg[1]] = Var(arg[1], arg[0], 1, argument = True, reg = reg)    
-
-        # compile insides
-        parse.parse(tokens[tokens.index("{") + 1:-1], True)
-
-        if funcrcl[-1][0:3] != "RET": # add return if it doesnt have one
-            funcrcl += ["PSH R0", f"PSH {func_ret_addr}", "RET"] # R0 = none
-
-        # free & clean up
-        for arg in arg_table: free_reg(arg_table[arg])
-        vars = before
-        free_reg(return_address)
-        """
-
+        # parsing
         name = expr[1]
         args = Reader(expr[3:expr.index(")")]).split(",")
         ret_type = expr[expr.index(")") + 3]
 
-        func = Func(name, args, ret_type)
-        self.funcs[name] = func
+        # setup
+        self.funcs[name] = func = Func(name, args, ret_type, self.manager) # woah triple setting :sunglasses:
+        vars_save    = copy(self.vars)
+        manager_save = copy(self.manager)
 
+        # prepare manager
         self.manager.in_func = True
+        #//self.manager.available_reg = list(range(1, config.regs))
+        var_names = list(self.vars.keys())
+        for var_name in var_names: # remove temps in regs
+            var = self.vars[var_name]
+            if var.type == "temp" or var.pointer.type in ["reg", "regpoi"]: # its in a register
+                var.free()
+        self.manager.available_reg.remove(1)
+
         func.header()
 
         # compile insides
         self.parser.tokens = Reader(expr[expr.index("{") + 1:expr.index("}")])
-        use = self.compile(self.parser.parse()) # todo implement compiler return use
-        use = {"regs": 4, "global_ram": 5}
+        use = self.compile(self.parser.parse())
 
-        # todo add return if doesn't have one (default case)
+        # free, finish & clean up
+        func.finish(use["reg"])
+        self.vars    = vars_save
+        self.manager = manager_save
 
-        # free & clean up
-        self.manager.in_func = False
-
-    def compile(self, exprs: Reader[list[str]]):
+    def compile(self, exprs: Reader[list[str]]) -> dict[str, int]: # returns memory use
         def is_expr(expr: list[str]):
             if len(expr) >= 2:
                 if (expr[0] == "return") or (expr[1] == "=" and len(expr >= 3)) or (expr[0] in self.type_names): return True
@@ -135,3 +107,9 @@ class Compiler:
                 error("conditionals arent implemented yet")
             elif expr[0] == "object":
                 error("objects arent implemented yet")
+
+        use = {"reg": 0, "ram": 0}
+        use["reg"] = [x for x in range(1, config.regs) if x not in self.manager.available_reg]
+        use["ram"] = [x for x in range(1, config.heap) if x not in self.manager.available_ram]
+
+        return use
