@@ -391,6 +391,7 @@ class Func:
         self.args: list[list[str]] = args
         self.return_type = return_type
         self.manager = manager
+        self.returnpoi = Pointer(f"S{manager.tos}", "stack")
 
         self.used_regs: list[str] = []
         self.archived_regs: dict[str, str] = {}
@@ -398,14 +399,15 @@ class Func:
 
     def finish(self, reg_use: list[int]):
         reg_use.reverse()
+        self.manager.emit(["LSTR SP -2 0", f".return_{self.name}_{self.salt}"]) # default return 0(null)
         self.manager.emit("\n".join(["POP R0" for _ in range(0, len(self.args))]))
         self.manager.emit("\n".join([f"POP R{x}" for x in reg_use if x != 1]))
+        self.manager.emit(["JMP R1", f".end_{self.name}_{self.salt}"])
         reg_use.reverse()
 
         for i, line in enumerate(self.manager.header):
             if line == "@INSERTSAVE":
                 self.manager.header[i] = "\n".join([f"PSH R{x}" for x in reg_use if x != 1])
-                self.manager.emit(["LSTR SP -2 0", "JMP R1", f".end_{self.name}_{self.salt}"]) # default return 0(null)
                 return
 
     def header(self):

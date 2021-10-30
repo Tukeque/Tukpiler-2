@@ -12,6 +12,7 @@ class Manager:
     vars: dict[str, var.Var] = []
     funcs: dict[str, var.Func] = []
     in_func: bool              = False
+    current_func: var.Func     = None
     tos: int                   = 0
 
     header: list[str] = []
@@ -275,15 +276,36 @@ class Manager:
 
             debug(operands)
 
+        token = operands.pop()
         if not ret:
-            token = operands.pop()
-
             if token.type == "imm":
                 if config.arch == "urcl":
                     ret_var.set(var.Wrapped("imm", token.get()))
                 # todo silk
-            else:
+            elif token.type == "var":
                 return ret_var
+        else:
+            # todo make it push a stackpoi or stack depending on the type of the variable
+
+            if token.type == "imm":
+                if config.arch == "urcl":
+                    offset = self.current_func.returnpoi.get_int_addr() - self.tos
+
+                    self.emit(f"LSTR SP {offset} {token.value}")
+                # todo silk
+
+            elif token.type == "var":
+                if config.arch == "urcl":
+                    top_var = self.vars[token.get()]
+                    offset = self.current_func.returnpoi.get_int_addr() - self.tos
+
+                    if top_var.pointer.type == "reg" or top_var.pointer.type == "ram":
+                        self.emit(f"LSTR SP {offset} {top_var.pointer.addr}")
+                # todo silk
+
+            if config.arch == "urcl":
+                self.emit(f"JMP .return_{self.current_func.name}_{self.current_func.salt}")
+            # todo silk
 
         return ret_var
 

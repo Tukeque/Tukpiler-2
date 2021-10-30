@@ -67,9 +67,10 @@ class Compiler:
         manager_save = copy(self.manager)
 
         # prepare manager
-        self.manager.in_func = True
-        #//self.manager.available_reg = list(range(1, config.regs))
+        self.manager.in_func      = True
+        self.manager.current_func = func
         var_names = list(self.vars.keys())
+
         for var_name in var_names: # remove temps in regs
             var = self.vars[var_name]
             if var.type == "temp" or var.pointer.type in ["reg", "regpoi"]: # its in a register
