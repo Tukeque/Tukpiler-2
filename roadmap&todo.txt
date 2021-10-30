@@ -6,8 +6,10 @@
 [ ] pointers
 [ ] switch statements
 [ ] classes
+[ ] lambdas and walrus(:=) operator
 [ ] libraries (import & using)
 
 * TODO:
 [x] start writing functions
+[ ] make functions return
 [ ] add pointer & referincing support for parser and lexer
