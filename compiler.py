@@ -113,3 +113,7 @@ class Compiler:
         use["ram"] = [x for x in range(1, config.heap) if x not in self.manager.available_ram]
 
         return use
+
+    def output(self, file_name: str):
+        with open(file_name, "w") as f:
+            f.write(self.manager.header + self.manager.main)

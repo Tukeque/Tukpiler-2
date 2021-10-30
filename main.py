@@ -1,10 +1,11 @@
-from lexer    import Lexer
-from parse    import Parser
-from compiler import Compiler
 from sys      import argv as args
-from os       import path
+from compiler import Compiler
+from parse    import Parser
+from lexer    import Lexer
 from rich     import print
+from os       import path
 import config
+import error
 
 print("Tukpiler 2 2021\n")
 
@@ -87,7 +88,9 @@ compiler = Compiler(parser)
 compiler.compile(exprs)
 
 #* output
-print("[green]OUTPUT:")
-for line in compiler.manager.main:
-    print(line)
-# todo compiler.manager.save("output.urcl")
+compiler.output(out)
+
+if len(error.errors) > 0:
+    print(f"[red]Compiled unsuccesfully with {len(error.errors)} error(s)")
+else:
+    print(f"[green]Compiled succesfully with 0 errors and saved in {out}")
