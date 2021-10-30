@@ -385,7 +385,7 @@ class Var:
 
         self.altered = True
 
-class Func: # todo remake
+class Func:
     def __init__(self, name, args, return_type, manager):
         self.name = name
         self.args: list[list[str]] = args
@@ -396,29 +396,25 @@ class Func: # todo remake
         self.archived_regs: dict[str, str] = {}
         self.salt = random_salt()
 
-    def save(self) -> list[str]:
-        urcl = [f".save_{self.name}_{self.salt}", "POP R1"]
+    def finish(self, reg_use: list[int]):
+        reg_use.reverse()
+        self.manager.emit("\n".join(["POP R0" for _ in range(0, len(self.args))]))
+        self.manager.emit("\n".join([f"POP R{x}" for x in reg_use if x != 1]))
+        reg_use.reverse()
 
-        for reg in self.used_regs:
-            urcl.append(f"PSH {reg}")
+        for i, line in enumerate(self.manager.header):
+            if line == "@INSERTSAVE":
+                self.manager.header[i] = "\n".join([f"PSH R{x}" for x in reg_use if x != 1])
+                self.manager.emit(["LSTR SP -2 0", "JMP R1", f".end_{self.name}_{self.salt}"]) # default return 0(null)
+                return
 
-        return urcl
-
-    def restore(self) -> list[str]:
-        urcl = []
-
-        for reg in self.archived_regs:
-            urcl.append(f"LOD {reg} {self.archived_regs[reg]}")
-
-        return urcl
-
-    def header(self): # oops
-        self.manager.emit([f"func_{self.name}_{self.salt}", "POP R1"])
+    def header(self):
+        self.manager.emit([f".save_{self.name}_{self.salt}", "POP R1", "@INSERTSAVE", "JMP R1"])
+        self.manager.emit([f".func_{self.name}_{self.salt}", "POP R1"])
 
         self.args.reverse()
 
         for arg in self.args:
-            x = self.manager.get_var(arg[1], arg[0], self.manager.type_to_width[arg[0]], True if arg[0] != "num" or "none" else False)
-            x.pop()
+            self.manager.get_stack(arg[1], arg[0], self.manager.type_to_width[arg[0]])
 
-        self.args.reverse()
+        self.args.reverse() # restore args
