@@ -116,4 +116,4 @@ class Compiler:
 
     def output(self, file_name: str):
         with open(file_name, "w") as f:
-            f.write(self.manager.header + self.manager.main)
+            f.write("\n".join(self.manager.header + self.manager.main))
