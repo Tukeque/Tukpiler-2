@@ -10,11 +10,11 @@ class Manager:
     available_reg: list[int] = list(range(1, config.regs))
     var_order: list[var.Var] = []
     vars: dict[str, var.Var] = []
-    in_func: bool            = False
-    tos: int                 = 0
+    funcs: dict[str, var.Func] = []
+    in_func: bool              = False
+    tos: int                   = 0
 
     header: list[str] = []
-    funcs : list[str] = []
     main  : list[str] = []
 
     def __init__(self, vars: dict[str, var.Var], funcs: dict[str, var.Func], type_to_width: dict[str, int]):
@@ -61,20 +61,27 @@ class Manager:
         elif config.arch == "silk":
             return self.get_mem(var.random_plus_name(name), "num", "temp", 1)
 
-    def emit(self, x, func: bool = False):
+    def get_stack(self, name: str, type: str, width: int, kind: str = "var") -> var.Var:
+        if type == "none":
+            return self.var(var.Var(name, "none", kind, var.Pointer("M0", "ram"), 1, self))
+        else:
+            self.tos += 1
+            return self.var(var.Var(name, type, kind, var.Pointer(f"S{self.tos - 1}", "stack"), width, self))
+
+    def emit(self, x):
         debug(f"emitting {x}")
 
         if type(x) == str:
-            if not func:
+            if not self.in_func:
                 self.main.append(x)
             else:
-                self.funcs.append(x)
+                self.header.append(x)
 
         elif type(x) == list:
-            if not func:
+            if not self.in_func:
                 self.main += x
             else:
-                self.funcs += x
+                self.header += x
 
     def return_pointer(self, pointer: var.Pointer):
         if pointer.type == "reg":
@@ -282,7 +289,7 @@ class Manager:
 
     def evaluate(self, tokens: lexer.Reader[Token], vars: dict[str, var.Var], ret_var: var.Var = None, ret: bool = False):
         if ret_var == None:
-            ret_var = self.get_reg(var.random_name(), "num") # todo make return var dependant on shunting yard variable correlation (prepass)
+            ret_var = self.get_temp() # todo make return var dependant on shunting yard variable correlation (prepass)
 
         # step 1. forward and null check(and null return)
         if tokens.length() == 1:
