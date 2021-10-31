@@ -289,23 +289,22 @@ class Manager:
 
             if token.type == "imm":
                 if config.arch == "urcl":
-                    offset = self.current_func.returnpoi.get_int_addr() - self.tos
-
-                    self.emit(f"LSTR SP {offset} {token.value}")
+                    self.emit(f"LSTR SP @R {token.value}")
                 # todo silk
 
             elif token.type == "var":
                 if config.arch == "urcl":
                     top_var = self.vars[token.get()]
-                    offset = self.current_func.returnpoi.get_int_addr() - self.tos
 
                     if top_var.pointer.type == "reg" or top_var.pointer.type == "ram":
-                        self.emit(f"LSTR SP {offset} {top_var.pointer.addr}")
+                        self.emit(f"LSTR SP @R {top_var.pointer.addr}")
                 # todo silk
 
             if config.arch == "urcl":
                 self.emit(f"JMP .return_{self.current_func.name}_{self.current_func.salt}")
             # todo silk
+
+            self.current_func.returns += 1
 
         return ret_var
 

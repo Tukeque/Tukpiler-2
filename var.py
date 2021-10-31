@@ -387,28 +387,38 @@ class Var:
 
 class Func:
     def __init__(self, name, args, return_type, manager):
-        self.name = name
+        self.name                  = name
         self.args: list[list[str]] = args
-        self.return_type = return_type
-        self.manager = manager
-        self.returnpoi = Pointer(f"S{manager.tos}", "stack")
+        self.return_type           = return_type
+        self.manager               = manager
+        self.returnpoi             = Pointer(f"S{manager.tos}", "stack")
 
-        self.used_regs: list[str] = []
+        self.used_regs: list[str]          = []
         self.archived_regs: dict[str, str] = {}
-        self.salt = random_salt()
+        self.salt                          = random_salt()
+        self.returns                       = 1 # 1 for default return
 
     def finish(self, reg_use: list[int]):
+        reg_use.remove(1)
         reg_use.reverse()
-        self.manager.emit(["LSTR SP -2 0", f".return_{self.name}_{self.salt}"]) # default return 0(null)
+        self.manager.emit([f"LSTR SP @R 0", f".return_{self.name}_{self.salt}"]) # default return 0(null)
         self.manager.emit("\n".join(["POP R0" for _ in range(0, len(self.args))]))
-        self.manager.emit("\n".join([f"POP R{x}" for x in reg_use if x != 1]))
+        self.manager.emit("\n".join([f"POP R{x}" for x in reg_use]))
         self.manager.emit(["JMP R1", f".end_{self.name}_{self.salt}"])
         reg_use.reverse()
 
+        inserted_save = False
+
         for i, line in enumerate(self.manager.header):
-            if line == "@INSERTSAVE":
-                self.manager.header[i] = "\n".join([f"PSH R{x}" for x in reg_use if x != 1])
-                return
+            line: str
+
+            if line == "@INSERTSAVE" and not inserted_save:
+                self.manager.header[i] = "\n".join([f"PSH R{x}" for x in reg_use])
+                inserted_save = True
+
+            if line.count("@R") >= 1 and self.returns >= 1: # there is a @R and we have a @R to replace
+                self.manager.header[i] = line.replace("@R", f"-{len(reg_use) + len(self.args) + 2}")
+                self.returns -= 1
 
     def header(self):
         self.manager.emit([f".save_{self.name}_{self.salt}", "POP R1", "@INSERTSAVE", "JMP R1"])
