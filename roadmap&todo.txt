@@ -11,5 +11,9 @@
 
 * TODO:
 [x] start writing functions
-[ ] make functions return
-[ ] add pointer & referincing support for parser and lexer
+[x] make functions return
+[x] add proper TOS managing and use correct offsets
+[ ] add function calling
+[ ] add proper stack variables for functions
+[ ] fill out var.set() and var.get() for stack and stackpoi pointers and use python 3.10 match
+[ ] start writing conditionals
