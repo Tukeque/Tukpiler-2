@@ -12,6 +12,12 @@ class Reader(Generic[T]):
         self.pointer += 1
         return self.elements[self.pointer - 1]
 
+    def peek(self) -> T:
+        return self.elements[-1]
+
+    def peek_start(self) -> T:
+        return self.elements[0]
+
     def finished(self) -> bool:
         if self.pointer >= len(self.elements):
             return True
